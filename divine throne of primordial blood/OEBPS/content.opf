@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" version="3.0" unique-identifier="BookID">
+  <metadata>
+   <dc:identifier id="BookID" scheme="UUID"> 3b622266-b838-4003-bcb8-b126ee6ae1a2 </dc:identifier>
+   <dc:title>divine throne of primordial blood</dc:title>
+   <dc:language>en</dc:language>
+   <dc:publisher>NovelScrapper</dc:publisher>
+   <dc:creator>NovelScrapper</dc:creator>
+   <dc:date event="modification">2021-01-28</dc:date>
+  </metadata>
+  <manifest>
+  <item id="5-92" href="./divine throne of primordial blood/OEBPS/Content/Book5Chapter92Travel.html" media-type="application/html+xml" /><item id="5-93" href="./divine throne of primordial blood/OEBPS/Content/Book5Chapter93YouthfulAbundance.html" media-type="application/html+xml" /><item id="5-91" href="./divine throne of primordial blood/OEBPS/Content/Book5Chapter91Study.html" media-type="application/html+xml" /></manifest>
+  <spine toc="ncx">
+  <itemref idref="5-92" /><itemref idref="5-93" /><itemref idref="5-91" /></spine>
+  <guide>
+  </guide>
+</package>

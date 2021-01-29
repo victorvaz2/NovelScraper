@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" xmlns:opf="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="BookID">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+   <dc:identifier id="BookID" opf:scheme="UUID"> 3b622266-b838-4003-bcb8-b126ee6ae1a2 </dc:identifier>
+   <dc:title>The title</dc:title>
+   <dc:language>en</dc:language>
+   <dc:publisher>NovelScrapper</dc:publisher>
+   <dc:creator>NovelScrapper</dc:creator>
+   <dc:date opf:event="modification">2020-05-25</dc:date>
+  </metadata>
+  <manifest>
+  </manifest>
+  <spine toc="ncx">
+  </spine>
+  <guide>
+  </guide>
+</package>
