@@ -9,6 +9,7 @@
    <dc:date opf:event="modification">2020-05-25</dc:date>
   </metadata>
   <manifest>
+  <item id="toc" properties="nav" href="toc.xhtml" media-type="application/xhtml+xml" />
   </manifest>
   <spine toc="ncx">
   </spine>

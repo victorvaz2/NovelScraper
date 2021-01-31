@@ -6,6 +6,7 @@ import string
 import os
 from datetime import datetime
 import re
+from zipfile import ZipFile
 
 class Settings:
     FileName = ''
@@ -65,6 +66,7 @@ class Settings:
             file.write('application/epub+zip')
 
         copyfile(Settings.RootPath + 'content.opf', Settings.OEBPSPath + 'content.opf')
+        copyfile(Settings.RootPath + 'toc.xhtml', Settings.OEBPSPath + 'toc.xhtml')
 
         Settings.prepareOPF()
 
@@ -108,6 +110,25 @@ class Settings:
         root[2].insert(-1,newSpine)
         tree.write(Settings.OEBPSPath + 'content.opf', encoding='UTF-8',xml_declaration=True)
 
+    def addToTOC(titleText, path):
+        tree = ET.parse(Settings.OEBPSPath+'toc.xhtml')
+        root = tree.getroot()
+
+        newTag = ET.Element('li')
+        newChapter = ET.Element('a')
+        newChapter.set('href',path)
+        newChapter.text = titleText
+
+        newTag.insert(0,newChapter)
+        root[1][0][1].insert(-1,newTag)
+        tree.write(Settings.OEBPSPath + 'toc.xhtml', encoding='UTF-8',xml_declaration=True)
+
+    def toZip(dirName,name):
+        with ZipFile(name, 'w') as zipObj:
+            for folderName, subfolders, filenames in os.walk(dirName):
+                for filename in filenames:
+                    filePath = os.path.join(folderName, filename)
+                    zipObj.write(filePath)
 
 class Novelfull:
     
@@ -153,15 +174,15 @@ class Novelfull:
         pageContent = BeautifulSoup(request.text,'lxml')
         chapter = pageContent.find('div', class_='col-xs-12')
 
-        # Add the title
-        titleText = chapter.h2.a.text
-        titleTag = BeautifulSoup().new_tag('title')
-        titleTag.string = titleText
-        epubFile.head.append(titleTag)
-
         # Prepare the body tag
         newTag = BeautifulSoup().new_tag('body')
         epubFile.html.append(newTag)
+
+        # Add the title
+        titleText = chapter.h2.a.text
+        titleTag = BeautifulSoup().new_tag('h2')
+        titleTag.string = titleText
+        epubFile.body.append(titleTag)
 
         # Get next chapter url
         try:
@@ -189,7 +210,8 @@ class Novelfull:
             file.write(epubFileText)
 
         # Adds chapters to .opf
-        Settings.addToOPF(titleText,path)
+        Settings.addToOPF(titleText, path)
+        Settings.addToTOC(titleText, path)
 
         return (url)
 
@@ -197,15 +219,15 @@ class Novelfull:
 def main():
     
     # print(os.getcwd())
-    '''Settings.FileName = input('Title: ')
+    Settings.FileName = input('Name: ')
     url = input('Initial chapter URL: ')
     print('1 - Epub')
     print('2 - txt')
-    option = int(input('Option: '))'''
+    option = int(input('Option: '))
 
-    Settings.FileName = 'divine throne of primordial blood'
-    url = 'https://novelfull.com/divine-throne-of-primordial-blood/book-5-chapter-91-study.html'
-    option = 1
+    # Settings.FileName = ''
+    # url = 'https://novelfull.com/library-of-heavens-path/chapter-2265-authors-wrap-up.html'
+    # option = 1
     Settings.setPath()
     if option == 1:
        Settings.prepareEpub()
@@ -223,11 +245,12 @@ def main():
                 print('Downloading to .txt')
                 url = Novelfull.toText(request)
             
-            if(not url):
-                quit()
         else:
             print('Connection failed'),
 
+    if(option == 1):
+        print('Zipping...')
+        Settings.toZip(Settings.FileName,Settings.FileName+'.epub')
 
 if(__name__ == '__main__'):
     main()
