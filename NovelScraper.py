@@ -2,7 +2,6 @@ from bs4 import BeautifulSoup
 from shutil import copyfile
 from xml.etree import ElementTree as ET
 import requests
-import string
 import os
 from datetime import datetime
 import re
@@ -153,9 +152,7 @@ class Novelfull:
             if(p.text):
                 cleanChapterText += p.text + '\n'
 
-        printable = set(string.printable)
-        cleanChapterText = ''.join(filter(lambda x: x in printable, cleanChapterText))
-        file = open(Settings.RootPath + 'novel.txt','a')
+        file = open(Settings.RootPath + 'novel.txt','a', encoding='utf-8')
         file.write(title + '\n\n' + cleanChapterText + '\n\n\n\n')
         file.close()
         print(title)
@@ -198,15 +195,15 @@ class Novelfull:
         for p in chapterText:
             if(p.text):
                 epubFile.body.append(p)
-        
-        printable = set(string.printable)
-        epubFileText = ''.join(filter(lambda x: x in printable, str(epubFile)))
+
+        epubFileText = str(epubFile)
+        # re.sub(('[\W_]+'),'',epubFileText)
         
         print(titleText)
 
         titleText = ''.join(e for e in titleText if e.isalnum())
         path = Settings.ContentPath + titleText + '.html'
-        with open(path,'w') as file:
+        with open(path,'w', encoding='utf-8') as file:
             file.write(epubFileText)
 
         # Adds chapters to .opf
@@ -219,14 +216,14 @@ class Novelfull:
 def main():
     
     # print(os.getcwd())
-    Settings.FileName = input('Name: ')
+    Settings.FileName = input('File name: ')
     url = input('Initial chapter URL: ')
     print('1 - Epub')
     print('2 - txt')
     option = int(input('Option: '))
 
-    # Settings.FileName = ''
-    # url = 'https://novelfull.com/library-of-heavens-path/chapter-2265-authors-wrap-up.html'
+    # Settings.FileName = 'Divine Throne of Primordial Blood'
+    # url = 'https://novelfull.com/divine-throne-of-primordial-blood/book-5-chapter-163-arrival-of-a-visitor.html'
     # option = 1
     Settings.setPath()
     if option == 1:
