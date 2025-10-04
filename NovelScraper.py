@@ -5,249 +5,213 @@ import requests
 import os
 from datetime import datetime
 import re
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_STORED
+from pathlib import Path
 
 class Settings:
     FileName = ''
-    RootPath = './'
-    EpubRootPath = ''
-    MetaPath = ''
-    OEBPSPath = ''
-    ContentPath = ''
-    StylePath = ''
-    FontsPath = ''
+    RootPath = Path('./')
+    EpubRootPath = Path()
+    MetaPath = Path()
+    OEBPSPath = Path()
+    ContentPath = Path()
+    StylePath = Path()
+    FontsPath = Path()
 
-    def setPath():
-        Settings.EpubRootPath = Settings.RootPath + Settings.FileName + '/'
-        Settings.MetaPath = Settings.EpubRootPath + 'META-INF/'
-        Settings.OEBPSPath = Settings.EpubRootPath + 'OEBPS/'
-        Settings.ContentPath = Settings.OEBPSPath + 'Content/'
-        Settings.StylePath = Settings.OEBPSPath + 'Style/'
-        Settings.FontsPath = Settings.OEBPSPath + 'Fonts/'
+    @classmethod
+    def set_paths(cls):
+        cls.EpubRootPath = cls.RootPath / cls.FileName
+        cls.MetaPath = cls.EpubRootPath / 'META-INF'
+        cls.OEBPSPath = cls.EpubRootPath / 'OEBPS'
+        cls.ContentPath = cls.OEBPSPath / 'Content'
+        cls.StylePath = cls.OEBPSPath / 'Style'
+        cls.FontsPath = cls.OEBPSPath / 'Fonts'
 
-    def prepareEpub():
-        containerXML = '''<?xml version="1.0"?>
+    @classmethod
+    def prepare_epub(cls):
+        container_xml = '''<?xml version="1.0"?>
         <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
             <rootfiles>
                 <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
-        </rootfiles>
+            </rootfiles>
         </container>'''
         
-        try:
-            os.mkdir(Settings.EpubRootPath)
-        except OSError:
-            pass
-        try:
-            os.mkdir(Settings.MetaPath)
-        except OSError:
-            pass
-        try:
-            os.mkdir(Settings.OEBPSPath)
-        except OSError:
-            pass
-        try:
-            os.mkdir(Settings.ContentPath)
-        except OSError:
-            pass
-        try:
-            os.mkdir(Settings.StylePath)
-        except OSError:
-            pass
-        try:
-            os.mkdir(Settings.FontsPath)
-        except OSError:
-            pass
+        directories = [cls.EpubRootPath, cls.MetaPath, cls.OEBPSPath,
+                       cls.ContentPath, cls.StylePath, cls.FontsPath]
+        for dir_path in directories:
+            dir_path.mkdir(parents=True, exist_ok=True)
 
-        with open(Settings.MetaPath + 'container.xml', 'w') as file:
-            file.write(containerXML)
+        (cls.MetaPath / 'container.xml').write_text(container_xml)
+        (cls.EpubRootPath / 'mimetype').write_text('application/epub+zip')
 
-        with open(Settings.EpubRootPath + 'mimetype', 'w') as file:
-            file.write('application/epub+zip')
+        copyfile(cls.RootPath / 'content.opf', cls.OEBPSPath / 'content.opf')
+        copyfile(cls.RootPath / 'toc.xhtml', cls.OEBPSPath / 'toc.xhtml')
 
-        copyfile(Settings.RootPath + 'content.opf', Settings.OEBPSPath + 'content.opf')
-        copyfile(Settings.RootPath + 'toc.xhtml', Settings.OEBPSPath + 'toc.xhtml')
+        cls.prepare_opf()
 
-        Settings.prepareOPF()
-
-    def prepareOPF():
-        ET.register_namespace('','http://www.idpf.org/2007/opf')
-        # ET.register_namespace('opf','http://www.idpf.org/2007/opf')
-        ET.register_namespace('dc','http://purl.org/dc/elements/1.1/')
-        tree = ET.parse(Settings.OEBPSPath+'content.opf')
+    @classmethod
+    def prepare_opf(cls):
+        ET.register_namespace('', 'http://www.idpf.org/2007/opf')
+        ET.register_namespace('dc', 'http://purl.org/dc/elements/1.1/')
+        tree = ET.parse(cls.OEBPSPath / 'content.opf')
         root = tree.getroot()
-        root[0][1].text = Settings.FileName # Title
-        root[0][5].text = datetime.now().strftime('%Y-%m-%d') # Modified datetime
-        tree.write(Settings.OEBPSPath + 'content.opf', encoding='UTF-8',xml_declaration=True)
-
-    # returns an array with all numbers contained on the title
-    # Bla bla Book 1 chapter 73 ===> [1,73]
-    # Bla bla chapter 80        ===> [80]
-    def getVolumeAndChapter(title):
-        return list(re.findall(r'\d+',title))
-
-    def addToOPF(titleText, path):
-        # Adds chapters to .opf
-        tree = ET.parse(Settings.OEBPSPath+'content.opf')
-        root = tree.getroot()
+        ns = {'opf': 'http://www.idpf.org/2007/opf', 'dc': 'http://purl.org/dc/elements/1.1/'}
         
-        newChapter = ET.Element('item')
-        newSpine = ET.Element('itemref')
-        volume = (Settings.getVolumeAndChapter(titleText))[0]
-        # Pos 0 should have a number, however, pos 1 might not
-        # 'Bla bla chapter 583' would only have pos 0
-        try:
-            chapterNumber = (Settings.getVolumeAndChapter(titleText))[1]
-        except:
-            chapterNumber = volume
-
-        newChapter.set('id',volume +'-'+ chapterNumber)
-        newChapter.set('href',path)
-        newChapter.set('media-type','application/html+xml')
-        newSpine.set('idref',volume +'-'+ chapterNumber)
+        title_elem = root.find('.//dc:title', ns)
+        if title_elem is not None:
+            title_elem.text = cls.FileName
         
-        root[1].insert(-1,newChapter)
-        root[2].insert(-1,newSpine)
-        tree.write(Settings.OEBPSPath + 'content.opf', encoding='UTF-8',xml_declaration=True)
+        modified_elem = root.find('.//opf:meta[@property="dcterms:modified"]', ns)
+        if modified_elem is not None:
+            modified_elem.text = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        
+        tree.write(cls.OEBPSPath / 'content.opf', encoding='UTF-8', xml_declaration=True)
 
-    def addToTOC(titleText, path):
-        tree = ET.parse(Settings.OEBPSPath+'toc.xhtml')
+    @staticmethod
+    def get_volume_chapter(title):
+        numbers = re.findall(r'\d+', title)
+        return [int(num) for num in numbers] if numbers else [0]
+
+    @classmethod
+    def add_to_opf(cls, title_text, path):
+        ET.register_namespace('', 'http://www.idpf.org/2007/opf')
+        tree = ET.parse(cls.OEBPSPath / 'content.opf')
         root = tree.getroot()
+        ns = {'opf': 'http://www.idpf.org/2007/opf'}
+        
+        numbers = cls.get_volume_chapter(title_text)
+        vol = numbers[0] if numbers else 0
+        ch = numbers[1] if len(numbers) > 1 else vol
 
-        newTag = ET.Element('li')
-        newChapter = ET.Element('a')
-        newChapter.set('href',path)
-        newChapter.text = titleText
+        item_id = f"{vol}-{ch}"
+        manifest = root.find('opf:manifest', ns)
+        spine = root.find('opf:spine', ns)
 
-        newTag.insert(0,newChapter)
-        root[1][0][1].insert(-1,newTag)
-        tree.write(Settings.OEBPSPath + 'toc.xhtml', encoding='UTF-8',xml_declaration=True)
+        item = ET.SubElement(manifest, 'item', {'id': item_id, 'href': path, 'media-type': 'application/xhtml+xml'})
+        itemref = ET.SubElement(spine, 'itemref', {'idref': item_id})
+        
+        tree.write(cls.OEBPSPath / 'content.opf', encoding='UTF-8', xml_declaration=True)
 
-    def toZip(dirName,name):
-        with ZipFile(name, 'w') as zipObj:
-            for folderName, subfolders, filenames in os.walk(dirName):
-                for filename in filenames:
-                    filePath = os.path.join(folderName, filename)
-                    zipObj.write(filePath)
+    @classmethod
+    def add_to_toc(cls, title_text, path):
+        tree = ET.parse(cls.OEBPSPath / 'toc.xhtml')
+        root = tree.getroot()
+        ns = {'xhtml': 'http://www.w3.org/1999/xhtml'}
+        
+        li = ET.Element('li')
+        a = ET.SubElement(li, 'a', {'href': path})
+        a.text = title_text
+        
+        nav = root.find('.//xhtml:nav', ns)
+        if nav is not None:
+            ol = nav.find('xhtml:ol', ns)
+            if ol is not None:
+                ol.append(li)
+                tree.write(cls.OEBPSPath / 'toc.xhtml', encoding='UTF-8', xml_declaration=True)
+
+    @classmethod
+    def to_zip(cls, dir_name, output_name):
+        epub_path = Path(output_name).with_suffix('.epub')
+        with ZipFile(epub_path, 'w') as zipf:
+            zipf.write(cls.EpubRootPath / 'mimetype', 'mimetype', compress_type=ZIP_STORED)
+            for file_path in cls.EpubRootPath.glob('**/*'):
+                if file_path.is_file() and file_path.name != 'mimetype':
+                    arcname = file_path.relative_to(cls.EpubRootPath)
+                    zipf.write(file_path, arcname)
 
 class Novelfull:
-    
-    def toText(request):
-        soup = BeautifulSoup(request.text,'lxml')
+    @staticmethod
+    def parse_chapter(request):
+        soup = BeautifulSoup(request.text, 'lxml')
         chapter = soup.find('div', class_='col-xs-12')
-        title = chapter.h2.a.text
-
-        # Get next chapter url
-        try:
-            url = 'https://novelfull.com' + chapter.find('a', id='next_chap')['href']
-        except:
-            url = ''
-
-        chapterText = chapter.find('div', id='chapter-content')
-        chapterText = chapterText.find_all('p')
-        cleanChapterText = ''
+        title = chapter.h2.a.text if chapter and chapter.h2 else "No Title"
         
-        # Adds a new paragraph if the p tag is not empty (tons of empty p tags on this website)
-        # As a bonus, excludes ads since they are on div tags
-        for p in chapterText:
-            if(p.text):
-                cleanChapterText += p.text + '\n'
+        next_url = ''
+        next_link = chapter.find('a', id='next_chap') if chapter else None
+        if next_link and 'href' in next_link.attrs:
+            next_url = f"https://novelfull.com{next_link['href']}"
+        
+        return title, next_url
 
-        file = open(Settings.RootPath + 'novel.txt','a', encoding='utf-8')
-        file.write(title + '\n\n' + cleanChapterText + '\n\n\n\n')
-        file.close()
+    @staticmethod
+    def to_text(request, file_handle):
+        title, next_url = Novelfull.parse_chapter(request)
+        soup = BeautifulSoup(request.text, 'lxml')
+        chapter_content = soup.find('div', id='chapter-content')
+        paragraphs = [p.text for p in chapter_content.find_all('p') if p.text.strip()] if chapter_content else []
+        
+        file_handle.write(f"{title}\n\n")
+        file_handle.write('\n'.join(paragraphs))
+        file_handle.write('\n\n\n\n')
         print(title)
-        # print(cleanChapterText)
-        # print(url)
-        return (url)
+        return next_url
+
+    @staticmethod
+    def to_epub(request):
+        title, next_url = Novelfull.parse_chapter(request)
+        soup = BeautifulSoup(request.text, 'lxml')
+        chapter_content = soup.find('div', id='chapter-content')
         
-    def toEpub(request):
-
-        # Prepare head tag
-        epubFile = BeautifulSoup('<html></html>','lxml')
-        newTag = BeautifulSoup().new_tag('head')
-        epubFile.html.append(newTag)
-
-        # Get the page content
-        pageContent = BeautifulSoup(request.text,'lxml')
-        chapter = pageContent.find('div', class_='col-xs-12')
-
-        # Prepare the body tag
-        newTag = BeautifulSoup().new_tag('body')
-        epubFile.html.append(newTag)
-
-        # Add the title
-        titleText = chapter.h2.a.text
-        titleTag = BeautifulSoup().new_tag('h2')
-        titleTag.string = titleText
-        epubFile.body.append(titleTag)
-
-        # Get next chapter url
-        try:
-            url = 'https://novelfull.com' + chapter.find('a', id='next_chap')['href']
-        except:
-            url = ''
-
-        chapterText = chapter.find('div', id='chapter-content')
-        chapterText = chapterText.find_all('p')
+        epub_html = BeautifulSoup('<html xmlns="http://www.w3.org/1999/xhtml"></html>', 'lxml-xml')
+        head = epub_html.new_tag('head')
+        epub_html.html.append(head)
+        body = epub_html.new_tag('body')
+        epub_html.html.append(body)
         
-        # Adds a new paragraph if the p tag is not empty (tons of empty p tags on this website)
-        # As a bonus, excludes ads since they are on div tags
-        for p in chapterText:
-            if(p.text):
-                epubFile.body.append(p)
-
-        epubFileText = str(epubFile)
-        # re.sub(('[\W_]+'),'',epubFileText)
+        if title:
+            h2 = epub_html.new_tag('h2')
+            h2.string = title
+            body.append(h2)
         
-        print(titleText)
-
-        titleText = ''.join(e for e in titleText if e.isalnum())
-        path = Settings.ContentPath + titleText + '.html'
-        with open(path,'w', encoding='utf-8') as file:
-            file.write(epubFileText)
-
-        # Adds chapters to .opf
-        Settings.addToOPF(titleText, path)
-        Settings.addToTOC(titleText, path)
-
-        return (url)
-
+        if chapter_content:
+            for p in chapter_content.find_all('p'):
+                if p.text.strip():
+                    new_p = epub_html.new_tag('p')
+                    new_p.string = p.text
+                    body.append(new_p)
+        
+        safe_title = re.sub(r'[\W_]+', '', title)
+        content_path = Settings.ContentPath / f"{safe_title}.xhtml"
+        content_path.write_text(epub_html.prettify(), encoding='utf-8')
+        
+        Settings.add_to_opf(title, f"Content/{safe_title}.xhtml")
+        Settings.add_to_toc(title, f"Content/{safe_title}.xhtml")
+        
+        print(title)
+        return next_url
 
 def main():
+    Settings.FileName = input('File name: ').strip()
+    initial_url = input('Initial chapter URL: ').strip()
+    print('1 - Epub\n2 - Txt')
+    option = input('Option: ').strip()
     
-    # print(os.getcwd())
-    Settings.FileName = input('File name: ')
-    url = input('Initial chapter URL: ')
-    print('1 - Epub')
-    print('2 - txt')
-    option = int(input('Option: '))
+    Settings.set_paths()
+    if option == '1':
+        Settings.prepare_epub()
+    
+    next_url = initial_url
+    file_handle = None
+    if option == '2':
+        file_handle = open(Settings.RootPath / 'novel.txt', 'a', encoding='utf-8')
+    
+    while next_url:
+        try:
+            resp = requests.get(next_url)
+            resp.raise_for_status()
+            if option == '1':
+                next_url = Novelfull.to_epub(resp)
+            elif option == '2' and file_handle:
+                next_url = Novelfull.to_text(resp, file_handle)
+        except requests.RequestException as e:
+            print(f"Error fetching {next_url}: {e}")
+            break
+    
+    if file_handle:
+        file_handle.close()
+    if option == '1':
+        Settings.to_zip(Settings.EpubRootPath, Settings.FileName)
+        print(f"ePub created: {Settings.FileName}.epub")
 
-    # Settings.FileName = 'Divine Throne of Primordial Blood'
-    # url = 'https://novelfull.com/divine-throne-of-primordial-blood/book-5-chapter-163-arrival-of-a-visitor.html'
-    # option = 1
-    Settings.setPath()
-    if option == 1:
-       Settings.prepareEpub()
-   
-    while(url):
-        request = requests.get(url)
-        #print('Connecting...')
-        if(request.status_code == 200):
-            #print('Connected...')
-            if(option == 1):
-                print('Downloading to .epub')
-                url = Novelfull.toEpub(request)
-
-            elif(option == 2):
-                print('Downloading to .txt')
-                url = Novelfull.toText(request)
-            
-        else:
-            print('Connection failed'),
-
-    if(option == 1):
-        print('Zipping...')
-        Settings.toZip(Settings.FileName,Settings.FileName+'.epub')
-
-if(__name__ == '__main__'):
+if __name__ == '__main__':
     main()
